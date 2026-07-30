@@ -36,3 +36,11 @@ Thumbs.db
 # Generated semantic indexes
 data/generated/*.npz
 data/generated/semantic_index.json
+
+# Generated database and vector embeddings
+*.duckdb
+data/generated/*.npz
+
+# Keep lightweight generated metadata
+!data/generated/document_chunks.jsonl
+!data/generated/semantic_index.json
