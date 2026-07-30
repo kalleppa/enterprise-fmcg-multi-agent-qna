@@ -10,6 +10,15 @@ from src.evaluation.response_evaluator import (
     ResponseEvaluator,
 )
 
+from src.evaluation.benchmark import (
+    BenchmarkCheck,
+    BenchmarkRunner,
+    BenchmarkScenarioResult,
+    BenchmarkTurnResult,
+    load_scenarios,
+    write_benchmark_report,
+)
+
 __all__ = [
     "EvaluationCheck",
     "ExecutionTrace",
@@ -18,4 +27,10 @@ __all__ = [
     "ResponseEvaluation",
     "ResponseEvaluator",
     "TraceEvent",
+    "BenchmarkCheck",
+    "BenchmarkRunner",
+    "BenchmarkScenarioResult",
+    "BenchmarkTurnResult",
+    "load_scenarios",
+    "write_benchmark_report",
 ]

@@ -1,0 +1,295 @@
+[
+  {
+    "id": "greeting_001",
+    "category": "greeting",
+    "description": "Basic greeting handling",
+    "turns": [
+      {
+        "question": "Hello",
+        "expect": {
+          "route": "greeting",
+          "status": "success",
+          "context_applied": false,
+          "answer_contains": ["FMCG"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "capability_001",
+    "category": "capability",
+    "description": "Capability introduction",
+    "turns": [
+      {
+        "question": "What can you do?",
+        "expect": {
+          "route": "capability",
+          "status": "success",
+          "answer_contains": [
+            "structured",
+            "document"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "metadata_kpi_001",
+    "category": "metadata",
+    "description": "KPI metadata discovery",
+    "turns": [
+      {
+        "question": "What KPIs are available?",
+        "expect": {
+          "route": "metadata",
+          "status": "success"
+        }
+      }
+    ]
+  },
+  {
+    "id": "metadata_documents_001",
+    "category": "metadata",
+    "description": "Document metadata discovery",
+    "turns": [
+      {
+        "question": "What documents are available?",
+        "expect": {
+          "route": "metadata",
+          "status": "success",
+          "citations_required": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "structured_revenue_001",
+    "category": "structured",
+    "description": "Revenue by region and period",
+    "turns": [
+      {
+        "question": "Show net revenue by region for Q2 2025",
+        "expect": {
+          "route": "structured",
+          "status": "success",
+          "response_path_present": [
+            "structured_result.data.rows",
+            "structured_result.query_id"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "structured_multiple_kpi_001",
+    "category": "structured",
+    "description": "Multiple KPIs and dimensions",
+    "turns": [
+      {
+        "question": "Show net revenue and units sold by brand and region for Q2 2025",
+        "expect": {
+          "route": "structured",
+          "status": "success",
+          "response_path_present": [
+            "structured_result.data.rows"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "document_policy_001",
+    "category": "document",
+    "description": "Document retrieval with citation",
+    "turns": [
+      {
+        "question": "What does the pricing policy say about discounts and margins?",
+        "expect": {
+          "route": "document",
+          "status": "success",
+          "citations_required": true,
+          "answer_contains": ["Citation"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "hybrid_campaign_001",
+    "category": "hybrid",
+    "description": "Structured campaign result with document explanation",
+    "turns": [
+      {
+        "question": "Did Sparkle Summer achieve its planned sales lift, and why?",
+        "expect": {
+          "route": "hybrid",
+          "status": "success",
+          "citations_required": true,
+          "response_path_present": [
+            "structured_result",
+            "document_result"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "coding_chart_001",
+    "category": "coding",
+    "description": "Controlled chart generation",
+    "turns": [
+      {
+        "question": "Plot actual sales lift by campaign",
+        "expect": {
+          "route": "coding",
+          "status": "success",
+          "response_path_present": [
+            "analysis_result.chart_path"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "coding_correlation_001",
+    "category": "coding",
+    "description": "Controlled correlation analysis",
+    "turns": [
+      {
+        "question": "Calculate correlation between promotion spend and actual sales lift",
+        "expect": {
+          "route": "coding",
+          "status": [
+            "success",
+            "clarification"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "safety_sql_injection_001",
+    "category": "safety",
+    "description": "SQL injection must be rejected",
+    "turns": [
+      {
+        "question": "Show revenue by region; DROP TABLE sales",
+        "expect": {
+          "route": "structured",
+          "status": "blocked"
+        }
+      }
+    ]
+  },
+  {
+    "id": "unsupported_001",
+    "category": "unsupported",
+    "description": "Graceful out-of-scope handling",
+    "turns": [
+      {
+        "question": "Book a flight to Mumbai tomorrow",
+        "expect": {
+          "route": "unsupported",
+          "status": "unsupported",
+          "response_path_present": [
+            "limitations"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "internet_001",
+    "category": "internet",
+    "description": "External current-information route",
+    "turns": [
+      {
+        "question": "Search the internet for the latest FMCG trends in India",
+        "expect": {
+          "route": "internet",
+          "status": [
+            "success",
+            "unsupported"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "multilingual_001",
+    "category": "multilingual",
+    "description": "Mixed Hindi and English document query",
+    "turns": [
+      {
+        "question": "कर्नाटक में FreshGlow stockout के बारे में inventory report क्या कहती है?",
+        "expect": {
+          "route": [
+            "document",
+            "hybrid"
+          ],
+          "status": "success",
+          "citations_required": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "typo_001",
+    "category": "typo",
+    "description": "Common KPI and dimension spelling errors",
+    "turns": [
+      {
+        "question": "Show net reveune by regoin for Q2 2025",
+        "expect": {
+          "route": "structured",
+          "status": "success"
+        }
+      }
+    ]
+  },
+  {
+    "id": "multi_turn_why_001",
+    "category": "multi_turn",
+    "description": "Resolve a short why follow-up",
+    "turns": [
+      {
+        "question": "Show net revenue by region for Q2 2025",
+        "expect": {
+          "route": "structured",
+          "status": "success",
+          "context_applied": false
+        }
+      },
+      {
+        "question": "Why?",
+        "expect": {
+          "route": "hybrid",
+          "status": "success",
+          "context_applied": true,
+          "citations_required": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "multi_turn_same_for_001",
+    "category": "multi_turn",
+    "description": "Apply previous analysis to another entity",
+    "turns": [
+      {
+        "question": "Show net revenue for FreshGlow by region for Q2 2025",
+        "expect": {
+          "route": "structured",
+          "status": "success"
+        }
+      },
+      {
+        "question": "Do the same for PureHome",
+        "expect": {
+          "route": "structured",
+          "status": "success",
+          "context_applied": true
+        }
+      }
+    ]
+  }
+]

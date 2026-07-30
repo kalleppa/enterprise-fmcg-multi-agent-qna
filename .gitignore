@@ -48,3 +48,6 @@ data/generated/*.npz
 # Generated analysis charts
 data/generated/charts/
 
+# Generated benchmark reports
+data/generated/evaluation/
+
