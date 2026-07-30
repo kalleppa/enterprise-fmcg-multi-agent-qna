@@ -5,3 +5,4 @@ sqlglot>=25.0.0
 pytest>=8.0.0
 PyYAML>=6.0
 sentence-transformers>=5.0,<6.0
+matplotlib>=3.9,<4.0

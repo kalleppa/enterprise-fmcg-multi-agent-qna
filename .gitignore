@@ -44,3 +44,6 @@ data/generated/*.npz
 # Keep lightweight generated metadata
 !data/generated/document_chunks.jsonl
 !data/generated/semantic_index.json
+
+# Generated analysis charts
+data/generated/charts/
