@@ -1,0 +1,12 @@
+sku_id,product_name,brand,category,subcategory,pack_size,launch_date,discontinuation_date,status,unit_price_inr,base_cogs_ratio
+FG-DW-LEM-500,FreshGlow Lemon Dishwash,FreshGlow,Home Care,Dishwash,500 ml,2023-06-01,,Active,115,0.54
+FG-DW-LEM-1L,FreshGlow Lemon Dishwash,FreshGlow,Home Care,Dishwash,1 litre,2023-06-01,,Active,205,0.54
+FG-SC-LAV-500,FreshGlow Lavender Surface Cleaner,FreshGlow,Home Care,Surface Cleaner,500 ml,2023-09-01,,Active,135,0.56
+FG-SC-LAV-1L,FreshGlow Lavender Surface Cleaner,FreshGlow,Home Care,Surface Cleaner,1 litre,2023-09-01,,Active,235,0.56
+PH-HW-ALO-250,PureHome Aloe Handwash,PureHome,Personal Care,Handwash,250 ml,2023-04-01,,Active,95,0.5
+PH-HW-ALO-500,PureHome Aloe Handwash,PureHome,Personal Care,Handwash,500 ml,2023-04-01,,Active,165,0.5
+PH-BW-NEE-500,PureHome Neem Body Wash,PureHome,Personal Care,Body Wash,500 ml,2023-11-01,,Active,225,0.52
+PH-HW-ROS-250,PureHome Rose Handwash,PureHome,Personal Care,Handwash,250 ml,2022-08-01,2025-03-31,Discontinued,90,0.51
+NB-GR-CHO-250,NutriBite Chocolate Granola,NutriBite,Packaged Foods,Breakfast Cereal,250 g,2023-02-01,,Active,180,0.61
+NB-GR-HON-500,NutriBite Honey Granola,NutriBite,Packaged Foods,Breakfast Cereal,500 g,2023-02-01,,Active,320,0.61
+NB-PB-CHO-6P,NutriBite Chocolate Protein Bars,NutriBite,Packaged Foods,Protein Bars,Pack of 6,2024-01-01,,Active,270,0.6

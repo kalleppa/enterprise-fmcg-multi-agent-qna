@@ -1,0 +1,9 @@
+geography_id,country,region,state,city
+GEO-S-001,India,South Region,Karnataka,Bengaluru
+GEO-S-002,India,South Region,Tamil Nadu,Chennai
+GEO-W-001,India,West Region,Maharashtra,Mumbai
+GEO-W-002,India,West Region,Gujarat,Ahmedabad
+GEO-N-001,India,North Region,Delhi,Delhi
+GEO-N-002,India,North Region,Uttar Pradesh,Lucknow
+GEO-E-001,India,East Region,West Bengal,Kolkata
+GEO-E-002,India,East Region,Odisha,Bhubaneswar

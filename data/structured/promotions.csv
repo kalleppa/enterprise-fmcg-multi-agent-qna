@@ -1,0 +1,6 @@
+campaign_id,campaign_name,sku_id,geography_id,channel,start_date,end_date,promotion_spend_inr,planned_sales_lift_pct,actual_sales_lift_pct,campaign_status
+CMP-2025-001,Sparkle Summer 2025,FG-DW-LEM-500,GEO-S-001,General Trade,2025-04-01,2025-06-30,2500000,15.0,6.8,Completed
+CMP-2025-001,Sparkle Summer 2025,FG-DW-LEM-500,GEO-S-002,Modern Trade,2025-04-01,2025-06-30,1800000,15.0,7.4,Completed
+CMP-2025-002,NutriBite Digital Boost,NB-GR-HON-500,GEO-W-001,E-commerce,2025-01-01,2025-03-31,1200000,18.0,22.1,Completed
+CMP-2025-002,NutriBite Digital Boost,NB-GR-HON-500,GEO-W-002,E-commerce,2025-01-01,2025-03-31,800000,18.0,20.6,Completed
+CMP-2024-003,PureHome Hygiene Week,PH-HW-ALO-250,GEO-N-001,Modern Trade,2024-08-01,2024-08-31,650000,10.0,11.3,Completed

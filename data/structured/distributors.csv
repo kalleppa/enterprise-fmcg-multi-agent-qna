@@ -1,0 +1,13 @@
+distributor_id,distributor_name,region,state,channel,active_status
+DST-S-GT-01,Sunrise Distributors,South Region,Karnataka,General Trade,True
+DST-S-MT-01,Southern Retail Supply,South Region,Tamil Nadu,Modern Trade,True
+DST-S-EC-01,South Digital Fulfilment,South Region,Karnataka,E-commerce,True
+DST-W-GT-01,Western Trade Partners,West Region,Maharashtra,General Trade,True
+DST-W-MT-01,West Metro Retail Supply,West Region,Gujarat,Modern Trade,True
+DST-W-EC-01,West Digital Fulfilment,West Region,Maharashtra,E-commerce,True
+DST-N-GT-01,Capital Distribution Services,North Region,Delhi,General Trade,True
+DST-N-MT-01,North Star Retail Supply,North Region,Uttar Pradesh,Modern Trade,True
+DST-N-EC-01,North Digital Fulfilment,North Region,Delhi,E-commerce,True
+DST-E-GT-01,Eastern Consumer Supply,East Region,West Bengal,General Trade,True
+DST-E-MT-01,East Metro Retail Supply,East Region,Odisha,Modern Trade,True
+DST-E-EC-01,East Digital Fulfilment,East Region,West Bengal,E-commerce,True
