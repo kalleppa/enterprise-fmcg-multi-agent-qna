@@ -5,19 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-from src.agents.coding_agent import (
-    CodingAnalysisAgent,
-)
-from src.agents.document_agent import (
-    DocumentRetrievalAgent,
-)
-from src.agents.router import (
-    IntentRouter,
-    RouteDecision,
-)
-from src.agents.structured_agent import (
-    StructuredDataAgent,
-)
+from src.agents.coding_agent import CodingAnalysisAgent
+from src.agents.document_agent import DocumentRetrievalAgent
+from src.agents.internet_agent import InternetSearchAgent
+from src.agents.router import IntentRouter, RouteDecision
+from src.agents.structured_agent import StructuredDataAgent
 
 
 OrchestratorStatus = Literal[
@@ -50,9 +42,12 @@ class OrchestratorResponse:
     route: str
     answer: str
     route_decision: dict[str, Any]
+
     structured_result: dict[str, Any] | None = None
     document_result: dict[str, Any] | None = None
     analysis_result: dict[str, Any] | None = None
+    internet_result: dict[str, Any] | None = None
+
     citations: list[str] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
@@ -61,6 +56,8 @@ class OrchestratorResponse:
     )
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert the response to a serializable dictionary."""
+
         return asdict(self)
 
 
@@ -82,6 +79,7 @@ METRIC_ALIASES: dict[str, tuple[str, ...]] = {
     "gross_margin_inr": (
         "gross margin value",
         "margin value",
+        "gross margin inr",
     ),
     "gross_margin_pct": (
         "gross margin percentage",
@@ -92,15 +90,18 @@ METRIC_ALIASES: dict[str, tuple[str, ...]] = {
     ),
     "discount_inr": (
         "discount",
+        "discount value",
     ),
     "stockout_days": (
         "stockout days",
         "stockouts",
         "stockout",
+        "out of stock",
     ),
     "closing_stock_units": (
         "closing stock",
         "closing inventory",
+        "inventory units",
     ),
     "promotion_spend_inr": (
         "promotion spend",
@@ -111,50 +112,69 @@ METRIC_ALIASES: dict[str, tuple[str, ...]] = {
         "planned sales lift",
         "planned lift",
         "target lift",
+        "sales lift target",
     ),
     "actual_sales_lift_pct": (
         "actual sales lift",
         "actual lift",
         "sales lift",
     ),
+    "lift_variance_pct_points": (
+        "lift variance",
+        "target variance",
+    ),
 }
 
 
 DIMENSION_ALIASES: dict[str, tuple[str, ...]] = {
     "month": (
-        "month",
+        "by month",
         "monthly",
         "over time",
         "trend",
+        "month",
     ),
     "quarter": (
-        "quarter",
+        "by quarter",
         "quarterly",
+        "quarter",
     ),
     "year": (
-        "year",
+        "by year",
         "yearly",
+        "year",
     ),
     "region": (
-        "region",
+        "by region",
         "regional",
+        "region",
     ),
     "state": (
+        "by state",
         "state",
     ),
     "brand": (
+        "by brand",
         "brand",
     ),
     "product_name": (
+        "by product",
         "product",
     ),
     "sku_id": (
+        "by sku",
         "sku",
     ),
     "channel": (
+        "by channel",
         "channel",
     ),
+    "distributor_name": (
+        "by distributor",
+        "distributor",
+    ),
     "campaign_name": (
+        "by campaign",
         "campaign",
     ),
 }
@@ -169,6 +189,7 @@ class EnterpriseQnAOrchestrator:
         structured_agent: StructuredDataAgent | None = None,
         document_agent: DocumentRetrievalAgent | None = None,
         coding_agent: CodingAnalysisAgent | None = None,
+        internet_agent: InternetSearchAgent | None = None,
     ) -> None:
         self.router = router or IntentRouter()
 
@@ -187,19 +208,35 @@ class EnterpriseQnAOrchestrator:
             or CodingAnalysisAgent()
         )
 
+        self.internet_agent = (
+            internet_agent
+            or InternetSearchAgent()
+        )
+
     def answer(
         self,
         question: str,
     ) -> OrchestratorResponse:
-        """Route and execute one user request."""
+        """
+        Route and execute one user request.
+
+        The orchestrator does not directly access databases,
+        documents, external search providers, or analytical
+        libraries. It delegates those responsibilities to
+        specialist agents.
+        """
 
         decision = self.router.route(question)
 
         if decision.intent == "greeting":
-            return self._greeting_response(decision)
+            return self._greeting_response(
+                decision
+            )
 
         if decision.intent == "capability":
-            return self._capability_response(decision)
+            return self._capability_response(
+                decision
+            )
 
         if decision.intent == "metadata":
             return self._handle_metadata(
@@ -225,6 +262,24 @@ class EnterpriseQnAOrchestrator:
                 decision=decision,
             )
 
+        if decision.intent == "metadata":
+            return self._handle_metadata(
+                question=question,
+                decision=decision,
+            )
+
+        if decision.intent == "structured":
+            return self._handle_structured(
+                question=question,
+                decision=decision,
+            )
+
+        if decision.intent == "document":
+            return self._handle_document(
+                question=question,
+                decision=decision,
+            )
+
         if decision.intent == "coding":
             return self._handle_coding(
                 question=question,
@@ -232,41 +287,13 @@ class EnterpriseQnAOrchestrator:
             )
 
         if decision.intent == "internet":
-            return OrchestratorResponse(
-                status="unsupported",
-                route="internet",
-                answer=(
-                    "Internet search was requested, but the "
-                    "internet-search provider has not yet been "
-                    "configured in this prototype."
-                ),
-                route_decision=decision.to_dict(),
-                limitations=[
-                    "Only internal structured data, enterprise "
-                    "documents, and controlled analytics are "
-                    "currently available."
-                ],
-                follow_up_suggestions=[
-                    "Ask the same question using internal data.",
-                ],
+            return self._handle_internet(
+                question=question,
+                decision=decision,
             )
 
-        return OrchestratorResponse(
-            status="unsupported",
-            route="unsupported",
-            answer=(
-                "I could not map this request to a supported "
-                "FMCG business capability."
-            ),
-            route_decision=decision.to_dict(),
-            limitations=[
-                "The prototype supports FMCG structured data, "
-                "documents, hybrid questions, and controlled "
-                "analysis."
-            ],
-            follow_up_suggestions=[
-                "Ask what KPIs or documents are available.",
-            ],
+        return self._unsupported_response(
+            decision=decision
         )
 
     def _handle_metadata(
@@ -274,14 +301,27 @@ class EnterpriseQnAOrchestrator:
         question: str,
         decision: RouteDecision,
     ) -> OrchestratorResponse:
-        normalized = question.lower()
+        """Handle dataset, KPI, dimension, period, and document metadata."""
 
-        if (
-            "document" in normalized
-            or "report" in normalized
+        normalized_question = question.lower()
+
+        document_metadata_terms = (
+            "document",
+            "documents",
+            "report",
+            "reports",
+        )
+
+        if any(
+            term in normalized_question
+            for term in document_metadata_terms
         ):
             result = self.document_agent.answer(
                 question
+            )
+
+            result_dict = self._to_dict(
+                result
             )
 
             return OrchestratorResponse(
@@ -291,9 +331,21 @@ class EnterpriseQnAOrchestrator:
                 route="metadata",
                 answer=result.message,
                 route_decision=decision.to_dict(),
-                document_result=result.to_dict(),
-                citations=result.citations,
-                limitations=result.limitations,
+                document_result=result_dict,
+                citations=list(
+                    getattr(
+                        result,
+                        "citations",
+                        [],
+                    )
+                ),
+                limitations=list(
+                    getattr(
+                        result,
+                        "limitations",
+                        [],
+                    )
+                ),
             )
 
         result = self.structured_agent.answer(
@@ -307,8 +359,16 @@ class EnterpriseQnAOrchestrator:
             route="metadata",
             answer=result.message,
             route_decision=decision.to_dict(),
-            structured_result=result.to_dict(),
-            assumptions=result.assumptions,
+            structured_result=self._to_dict(
+                result
+            ),
+            assumptions=list(
+                getattr(
+                    result,
+                    "assumptions",
+                    [],
+                )
+            ),
         )
 
     def _handle_structured(
@@ -316,15 +376,21 @@ class EnterpriseQnAOrchestrator:
         question: str,
         decision: RouteDecision,
     ) -> OrchestratorResponse:
+        """Run structured-data retrieval."""
+
         result = self.structured_agent.answer(
             question
+        )
+
+        result_dict = self._to_dict(
+            result
         )
 
         answer = result.message
 
         if result.status == "success":
             answer = self._format_structured_answer(
-                result.to_dict()
+                result_dict
             )
 
         return OrchestratorResponse(
@@ -334,8 +400,14 @@ class EnterpriseQnAOrchestrator:
             route="structured",
             answer=answer,
             route_decision=decision.to_dict(),
-            structured_result=result.to_dict(),
-            assumptions=result.assumptions,
+            structured_result=result_dict,
+            assumptions=list(
+                getattr(
+                    result,
+                    "assumptions",
+                    [],
+                )
+            ),
             follow_up_suggestions=(
                 self._structured_follow_ups(
                     question
@@ -350,17 +422,29 @@ class EnterpriseQnAOrchestrator:
         question: str,
         decision: RouteDecision,
     ) -> OrchestratorResponse:
+        """Run document retrieval."""
+
         result = self.document_agent.answer(
             question=question,
             top_k=5,
+        )
+
+        result_dict = self._to_dict(
+            result
         )
 
         answer = result.message
 
         if result.status == "success":
             answer = self._format_document_answer(
-                result.to_dict()
+                result_dict
             )
+
+        evidence = getattr(
+            result,
+            "evidence",
+            [],
+        )
 
         return OrchestratorResponse(
             status=self._map_status(
@@ -369,15 +453,29 @@ class EnterpriseQnAOrchestrator:
             route="document",
             answer=answer,
             route_decision=decision.to_dict(),
-            document_result=result.to_dict(),
-            citations=result.citations,
-            limitations=result.limitations,
+            document_result=result_dict,
+            citations=list(
+                getattr(
+                    result,
+                    "citations",
+                    [],
+                )
+            ),
+            limitations=list(
+                getattr(
+                    result,
+                    "limitations",
+                    [],
+                )
+            ),
             follow_up_suggestions=(
                 [
-                    "Compare this document evidence with "
-                    "structured performance data."
+                    (
+                        "Compare this document evidence with "
+                        "structured performance data."
+                    )
                 ]
-                if result.evidence
+                if evidence
                 else []
             ),
         )
@@ -387,77 +485,114 @@ class EnterpriseQnAOrchestrator:
         question: str,
         decision: RouteDecision,
     ) -> OrchestratorResponse:
-        with ThreadPoolExecutor(
-            max_workers=2
-        ) as executor:
-            structured_future = executor.submit(
-                self.structured_agent.answer,
-                question,
-            )
+        """
+        Run structured and document retrieval concurrently.
 
-            document_future = executor.submit(
-                self.document_agent.answer,
-                question,
-                5,
-            )
+        Independent retrieval operations are executed in parallel
+        to reduce hybrid-request latency.
+        """
 
-            structured_result = (
-                structured_future.result()
-            )
+        try:
+            with ThreadPoolExecutor(
+                max_workers=2
+            ) as executor:
+                structured_future = executor.submit(
+                    self.structured_agent.answer,
+                    question,
+                )
 
-            document_result = (
-                document_future.result()
-            )
+                document_future = executor.submit(
+                    self.document_agent.answer,
+                    question,
+                    5,
+                )
 
-        successful_sources = sum(
-            [
-                structured_result.status
-                == "success",
-                document_result.status
-                == "success",
-            ]
-        )
+                structured_result = (
+                    structured_future.result()
+                )
 
-        if successful_sources == 0:
+                document_result = (
+                    document_future.result()
+                )
+
+        except Exception as error:
             return OrchestratorResponse(
                 status="error",
+                route="hybrid",
+                answer=(
+                    "The hybrid retrieval workflow failed "
+                    "before all specialist agents completed."
+                ),
+                route_decision=decision.to_dict(),
+                limitations=[
+                    str(error)
+                ],
+            )
+
+        structured_dict = self._to_dict(
+            structured_result
+        )
+
+        document_dict = self._to_dict(
+            document_result
+        )
+
+        structured_success = (
+            structured_result.status
+            == "success"
+        )
+
+        document_success = (
+            document_result.status
+            == "success"
+        )
+
+        if (
+            not structured_success
+            and not document_success
+        ):
+            return OrchestratorResponse(
+                status=self._combined_failure_status(
+                    structured_result.status,
+                    document_result.status,
+                ),
                 route="hybrid",
                 answer=(
                     "Neither structured retrieval nor document "
                     "retrieval produced usable evidence."
                 ),
                 route_decision=decision.to_dict(),
-                structured_result=(
-                    structured_result.to_dict()
-                ),
-                document_result=(
-                    document_result.to_dict()
-                ),
-                limitations=(
-                    document_result.limitations
+                structured_result=structured_dict,
+                document_result=document_dict,
+                limitations=list(
+                    getattr(
+                        document_result,
+                        "limitations",
+                        [],
+                    )
                 ),
             )
 
         answer = self._format_hybrid_answer(
-            structured_result=(
-                structured_result.to_dict()
-            ),
-            document_result=(
-                document_result.to_dict()
-            ),
+            structured_result=structured_dict,
+            document_result=document_dict,
         )
 
         limitations = list(
-            document_result.limitations
+            getattr(
+                document_result,
+                "limitations",
+                [],
+            )
         )
 
-        if structured_result.status != "success":
+        if not structured_success:
             limitations.append(
                 "Structured retrieval did not produce "
                 "a successful result."
             )
 
-        if document_result.status != "success":
+        if not document_success:
             limitations.append(
                 "Document retrieval did not produce "
                 "a successful result."
@@ -468,14 +603,22 @@ class EnterpriseQnAOrchestrator:
             route="hybrid",
             answer=answer,
             route_decision=decision.to_dict(),
-            structured_result=(
-                structured_result.to_dict()
+            structured_result=structured_dict,
+            document_result=document_dict,
+            citations=list(
+                getattr(
+                    document_result,
+                    "citations",
+                    [],
+                )
             ),
-            document_result=(
-                document_result.to_dict()
+            assumptions=list(
+                getattr(
+                    structured_result,
+                    "assumptions",
+                    [],
+                )
             ),
-            citations=document_result.citations,
-            assumptions=structured_result.assumptions,
             limitations=limitations,
             follow_up_suggestions=[
                 "Show the monthly trend for the same period.",
@@ -488,6 +631,11 @@ class EnterpriseQnAOrchestrator:
         question: str,
         decision: RouteDecision,
     ) -> OrchestratorResponse:
+        """
+        Retrieve approved structured data and pass it to
+        the controlled coding agent.
+        """
+
         plan = self._create_analysis_plan(
             question
         )
@@ -498,8 +646,8 @@ class EnterpriseQnAOrchestrator:
                 route="coding",
                 answer=(
                     "Please specify the analytical operation "
-                    "and columns, such as: plot net revenue by "
-                    "region, or calculate correlation between "
+                    "and columns. For example: plot net revenue "
+                    "by region, or calculate correlation between "
                     "promotion spend and actual sales lift."
                 ),
                 route_decision=decision.to_dict(),
@@ -518,6 +666,10 @@ class EnterpriseQnAOrchestrator:
             )
         )
 
+        structured_dict = self._to_dict(
+            structured_result
+        )
+
         if structured_result.status != "success":
             return OrchestratorResponse(
                 status=self._map_status(
@@ -526,15 +678,23 @@ class EnterpriseQnAOrchestrator:
                 route="coding",
                 answer=structured_result.message,
                 route_decision=decision.to_dict(),
-                structured_result=(
-                    structured_result.to_dict()
-                ),
-                assumptions=(
-                    structured_result.assumptions
+                structured_result=structured_dict,
+                assumptions=list(
+                    getattr(
+                        structured_result,
+                        "assumptions",
+                        [],
+                    )
                 ),
             )
 
-        rows = structured_result.data.get(
+        structured_data = getattr(
+            structured_result,
+            "data",
+            {},
+        )
+
+        rows = structured_data.get(
             "rows",
             [],
         )
@@ -552,12 +712,32 @@ class EnterpriseQnAOrchestrator:
             title=plan.title,
         )
 
+        analysis_dict = self._to_dict(
+            analysis_result
+        )
+
         answer = analysis_result.message
 
         if analysis_result.status == "success":
             answer = self._format_analysis_answer(
-                analysis_result.to_dict()
+                analysis_dict
             )
+
+        structured_assumptions = list(
+            getattr(
+                structured_result,
+                "assumptions",
+                [],
+            )
+        )
+
+        analysis_assumptions = list(
+            getattr(
+                analysis_result,
+                "assumptions",
+                [],
+            )
+        )
 
         return OrchestratorResponse(
             status=self._map_status(
@@ -566,30 +746,143 @@ class EnterpriseQnAOrchestrator:
             route="coding",
             answer=answer,
             route_decision=decision.to_dict(),
-            structured_result=(
-                structured_result.to_dict()
-            ),
-            analysis_result=(
-                analysis_result.to_dict()
-            ),
+            structured_result=structured_dict,
+            analysis_result=analysis_dict,
             assumptions=(
-                structured_result.assumptions
-                + analysis_result.assumptions
+                structured_assumptions
+                + analysis_assumptions
             ),
             follow_up_suggestions=(
                 [
-                    "Break the analysis down by another "
-                    "business dimension."
+                    (
+                        "Break the analysis down by another "
+                        "business dimension."
+                    )
                 ]
-                if analysis_result.status == "success"
+                if analysis_result.status
+                == "success"
                 else []
             ),
+        )
+
+    def _handle_internet(
+        self,
+        question: str,
+        decision: RouteDecision,
+    ) -> OrchestratorResponse:
+        """Run current external-information retrieval."""
+
+        normalized_question = (
+            question.lower()
+        )
+
+        is_current_request = any(
+            phrase in normalized_question
+            for phrase in (
+                "latest",
+                "current",
+                "today",
+                "news",
+                "recent",
+            )
+        )
+
+        topic = (
+            "news"
+            if is_current_request
+            else "general"
+        )
+
+        time_range = (
+            "month"
+            if is_current_request
+            else None
+        )
+
+        result = self.internet_agent.search(
+            query=question,
+            topic=topic,
+            max_results=5,
+            search_depth="basic",
+            time_range=time_range,
+        )
+
+        result_dict = self._to_dict(
+            result
+        )
+
+        if result.status == "unavailable":
+            return OrchestratorResponse(
+                status="unsupported",
+                route="internet",
+                answer=result.message,
+                route_decision=decision.to_dict(),
+                internet_result=result_dict,
+                limitations=list(
+                    getattr(
+                        result,
+                        "limitations",
+                        [],
+                    )
+                ),
+            )
+
+        if result.status != "success":
+            return OrchestratorResponse(
+                status=self._map_status(
+                    result.status
+                ),
+                route="internet",
+                answer=result.message,
+                route_decision=decision.to_dict(),
+                internet_result=result_dict,
+                limitations=list(
+                    getattr(
+                        result,
+                        "limitations",
+                        [],
+                    )
+                ),
+            )
+
+        answer = self._format_internet_answer(
+            result_dict
+        )
+
+        return OrchestratorResponse(
+            status="success",
+            route="internet",
+            answer=answer,
+            route_decision=decision.to_dict(),
+            internet_result=result_dict,
+            citations=list(
+                getattr(
+                    result,
+                    "citations",
+                    [],
+                )
+            ),
+            limitations=list(
+                getattr(
+                    result,
+                    "limitations",
+                    [],
+                )
+            ),
+            follow_up_suggestions=[
+                (
+                    "Compare the external findings with "
+                    "internal FMCG performance."
+                )
+            ],
         )
 
     def _create_analysis_plan(
         self,
         question: str,
     ) -> AnalysisPlan | None:
+        """Create an allowlisted analytical plan."""
+
         normalized = question.lower()
 
         metrics = self._detect_metrics(
@@ -606,25 +899,34 @@ class EnterpriseQnAOrchestrator:
                 second_y_column=metrics[1],
             )
 
-        if (
-            "percentage change" in normalized
-            or "percent change" in normalized
+        if any(
+            phrase in normalized
+            for phrase in (
+                "percentage change",
+                "percent change",
+            )
         ):
             if not metrics:
                 return None
 
             return AnalysisPlan(
                 operation="percentage_change",
-                x_column=self._detect_dimension(
-                    normalized
-                )
-                or "month",
+                x_column=(
+                    self._detect_dimension(
+                        normalized
+                    )
+                    or "month"
+                ),
                 y_column=metrics[0],
             )
 
-        if (
-            "summary statistics" in normalized
-            or "statistical summary" in normalized
+        if any(
+            phrase in normalized
+            for phrase in (
+                "summary statistics",
+                "statistical summary",
+                "descriptive statistics",
+            )
         ):
             return AnalysisPlan(
                 operation="summary"
@@ -641,10 +943,8 @@ class EnterpriseQnAOrchestrator:
             if not metrics:
                 return None
 
-            x_column = (
-                self._detect_dimension(
-                    normalized
-                )
+            x_column = self._detect_dimension(
+                normalized
             )
 
             if not x_column:
@@ -683,6 +983,13 @@ class EnterpriseQnAOrchestrator:
         question: str,
         plan: AnalysisPlan,
     ) -> str:
+        """
+        Add dimensions needed to create the analysis dataset.
+
+        The original user question is retained so that entity,
+        period, and KPI filters remain available.
+        """
+
         additions: list[str] = []
 
         if plan.operation == "correlation":
@@ -706,6 +1013,8 @@ class EnterpriseQnAOrchestrator:
     def _detect_metrics(
         question: str,
     ) -> list[str]:
+        """Detect metrics in the order they appear."""
+
         matches: list[
             tuple[int, str]
         ] = []
@@ -736,6 +1045,8 @@ class EnterpriseQnAOrchestrator:
             for _, metric in matches
         ]
 
+        # Prevent "revenue" inside "gross revenue"
+        # from becoming both gross and net revenue.
         if (
             "gross_revenue_inr" in detected
             and "net_revenue_inr" in detected
@@ -753,6 +1064,8 @@ class EnterpriseQnAOrchestrator:
     def _detect_dimension(
         question: str,
     ) -> str | None:
+        """Detect the requested analytical dimension."""
+
         for dimension, aliases in (
             DIMENSION_ALIASES.items()
         ):
@@ -768,16 +1081,27 @@ class EnterpriseQnAOrchestrator:
     def _format_structured_answer(
         result: dict[str, Any],
     ) -> str:
-        data = result.get("data", {})
-        rows = data.get("rows", [])
+        """Format structured rows as a Markdown table."""
+
+        data = result.get(
+            "data",
+            {},
+        )
+
+        rows = data.get(
+            "rows",
+            [],
+        )
 
         if not rows:
             return result.get(
                 "message",
-                "No data was returned.",
+                "No structured data was returned.",
             )
 
-        headers = list(rows[0].keys())
+        headers = list(
+            rows[0].keys()
+        )
 
         lines = [
             result.get(
@@ -800,21 +1124,46 @@ class EnterpriseQnAOrchestrator:
             lines.append(
                 "| "
                 + " | ".join(
-                    str(row.get(header, ""))
+                    str(
+                        row.get(
+                            header,
+                            "",
+                        )
+                    )
                     for header in headers
                 )
                 + " |"
             )
 
-        lines.extend(
-            [
-                "",
-                (
-                    f"Source: {data.get('source')} · "
-                    f"Query ID: {result.get('query_id')}"
-                ),
-            ]
+        if len(rows) > 10:
+            lines.extend(
+                [
+                    "",
+                    (
+                        f"Showing 10 of "
+                        f"{len(rows)} returned rows."
+                    ),
+                ]
+            )
+
+        source = data.get(
+            "source"
         )
+
+        query_id = result.get(
+            "query_id"
+        )
+
+        if source or query_id:
+            lines.extend(
+                [
+                    "",
+                    (
+                        f"Source: {source or 'unknown'} · "
+                        f"Query ID: {query_id or 'unknown'}"
+                    ),
+                ]
+            )
 
         return "\n".join(lines)
 
@@ -822,6 +1171,8 @@ class EnterpriseQnAOrchestrator:
     def _format_document_answer(
         result: dict[str, Any],
     ) -> str:
+        """Format document evidence with citations."""
+
         evidence = result.get(
             "evidence",
             [],
@@ -830,7 +1181,7 @@ class EnterpriseQnAOrchestrator:
         if not evidence:
             return result.get(
                 "message",
-                "No evidence was found.",
+                "No document evidence was found.",
             )
 
         lines = [
@@ -848,11 +1199,23 @@ class EnterpriseQnAOrchestrator:
                 [
                     "",
                     (
-                        f"{index}. **{item['title']} — "
-                        f"{item['section']}**"
+                        f"{index}. **"
+                        f"{item.get('title', 'Unknown document')}"
+                        f" — "
+                        f"{item.get('section', 'Unknown section')}"
+                        f"**"
                     ),
-                    item["snippet"],
-                    f"Citation: {item['citation']}",
+                    item.get(
+                        "snippet",
+                        item.get(
+                            "content",
+                            "",
+                        ),
+                    ),
+                    (
+                        f"Citation: "
+                        f"{item.get('citation', 'Unavailable')}"
+                    ),
                 ]
             )
 
@@ -863,6 +1226,8 @@ class EnterpriseQnAOrchestrator:
         structured_result: dict[str, Any],
         document_result: dict[str, Any],
     ) -> str:
+        """Combine structured evidence and document explanation."""
+
         lines = [
             "## Structured evidence",
             "",
@@ -918,7 +1283,7 @@ class EnterpriseQnAOrchestrator:
             lines.append(
                 structured_result.get(
                     "message",
-                    "No structured result.",
+                    "No structured evidence was returned.",
                 )
             )
 
@@ -934,16 +1299,36 @@ class EnterpriseQnAOrchestrator:
             [],
         )
 
+        if not evidence:
+            lines.extend(
+                [
+                    "",
+                    document_result.get(
+                        "message",
+                        (
+                            "No supporting document evidence "
+                            "was returned."
+                        ),
+                    ),
+                ]
+            )
+
         for item in evidence[:5]:
             lines.extend(
                 [
                     "",
                     (
-                        f"- **{item['title']} — "
-                        f"{item['section']}**: "
-                        f"{item['snippet']}"
+                        f"- **"
+                        f"{item.get('title', 'Unknown document')}"
+                        f" — "
+                        f"{item.get('section', 'Unknown section')}"
+                        f"**: "
+                        f"{item.get('snippet', '')}"
                     ),
-                    f"  Citation: {item['citation']}",
+                    (
+                        f"  Citation: "
+                        f"{item.get('citation', 'Unavailable')}"
+                    ),
                 ]
             )
 
@@ -953,6 +1338,8 @@ class EnterpriseQnAOrchestrator:
     def _format_analysis_answer(
         result: dict[str, Any],
     ) -> str:
+        """Format controlled analysis output."""
+
         lines = [
             result.get(
                 "message",
@@ -972,8 +1359,9 @@ class EnterpriseQnAOrchestrator:
                 analysis_results.items()
             ):
                 lines.append(
-                    f"- {EnterpriseQnAOrchestrator._humanize(key)}: "
-                    f"{value}"
+                    f"- "
+                    f"{EnterpriseQnAOrchestrator._humanize(key)}"
+                    f": {value}"
                 )
 
         chart_path = result.get(
@@ -991,9 +1379,70 @@ class EnterpriseQnAOrchestrator:
         return "\n".join(lines)
 
     @staticmethod
+    def _format_internet_answer(
+        result: dict[str, Any],
+    ) -> str:
+        """Format external search results with retrieval metadata."""
+
+        provider_answer = result.get(
+            "answer"
+        )
+
+        lines = [
+            provider_answer
+            or result.get(
+                "message",
+                "Internet search completed.",
+            ),
+            "",
+            "## External sources",
+        ]
+
+        sources = result.get(
+            "sources",
+            [],
+        )
+
+        retrieved_at = result.get(
+            "retrieved_at_utc",
+            "unknown",
+        )
+
+        if not sources:
+            lines.extend(
+                [
+                    "",
+                    "No usable external sources were returned.",
+                ]
+            )
+
+        for source in sources:
+            lines.extend(
+                [
+                    "",
+                    (
+                        f"{source.get('rank', '')}. "
+                        f"**{source.get('title', 'Untitled source')}**"
+                    ),
+                    source.get(
+                        "content",
+                        "",
+                    ),
+                    (
+                        f"Source: {source.get('url', '')} · "
+                        f"Retrieved: {retrieved_at}"
+                    ),
+                ]
+            )
+
+        return "\n".join(lines)
+
+    @staticmethod
     def _structured_follow_ups(
         question: str,
     ) -> list[str]:
+        """Return context-aware follow-up suggestions."""
+
         suggestions = [
             "Break this result down by channel.",
             "Compare it with the previous period.",
@@ -1004,23 +1453,41 @@ class EnterpriseQnAOrchestrator:
                 "Drill down from region to state."
             )
 
+        if "campaign" in question.lower():
+            suggestions = [
+                (
+                    "Compare planned and actual campaign "
+                    "performance by state."
+                ),
+                (
+                    "Retrieve the campaign documents that "
+                    "explain the result."
+                ),
+            ]
+
         return suggestions
 
     @staticmethod
     def _greeting_response(
         decision: RouteDecision,
     ) -> OrchestratorResponse:
+        """Return a deterministic greeting."""
+
         return OrchestratorResponse(
             status="success",
             route="greeting",
             answer=(
                 "Hello! I can help with FMCG sales, revenue, "
                 "margin, inventory, campaigns, enterprise "
-                "documents, and controlled data analysis."
+                "documents, current internet information, "
+                "and controlled data analysis."
             ),
             route_decision=decision.to_dict(),
             follow_up_suggestions=[
-                "Ask what KPIs and datasets are available.",
+                (
+                    "Ask what KPIs, datasets, and documents "
+                    "are available."
+                )
             ],
         )
 
@@ -1028,6 +1495,8 @@ class EnterpriseQnAOrchestrator:
     def _capability_response(
         decision: RouteDecision,
     ) -> OrchestratorResponse:
+        """Return a deterministic capability introduction."""
+
         return OrchestratorResponse(
             status="success",
             route="capability",
@@ -1035,9 +1504,8 @@ class EnterpriseQnAOrchestrator:
                 "I support structured FMCG analytics, "
                 "enterprise document retrieval with citations, "
                 "hybrid data-and-document questions, metadata "
-                "discovery, and controlled calculations and "
-                "charts. Internet search will be added as a "
-                "separate specialist agent."
+                "discovery, current internet search, and "
+                "controlled calculations and charts."
             ),
             route_decision=decision.to_dict(),
             follow_up_suggestions=[
@@ -1047,13 +1515,72 @@ class EnterpriseQnAOrchestrator:
         )
 
     @staticmethod
+    def _unsupported_response(
+        decision: RouteDecision,
+    ) -> OrchestratorResponse:
+        """Return a graceful out-of-scope response."""
+
+        return OrchestratorResponse(
+            status="unsupported",
+            route="unsupported",
+            answer=(
+                "I could not map this request to a supported "
+                "FMCG business capability."
+            ),
+            route_decision=decision.to_dict(),
+            limitations=[
+                (
+                    "The prototype supports structured FMCG "
+                    "data, enterprise documents, hybrid "
+                    "questions, current internet search, "
+                    "and controlled analysis."
+                )
+            ],
+            follow_up_suggestions=[
+                (
+                    "Ask what KPIs, datasets, or documents "
+                    "are available."
+                )
+            ],
+        )
+
+    @staticmethod
+    def _combined_failure_status(
+        structured_status: str,
+        document_status: str,
+    ) -> OrchestratorStatus:
+        """Select a final status when both hybrid agents fail."""
+
+        statuses = {
+            structured_status,
+            document_status,
+        }
+
+        if "blocked" in statuses:
+            return "blocked"
+
+        if "clarification" in statuses:
+            return "clarification"
+
+        if "unsupported" in statuses:
+            return "unsupported"
+
+        return "error"
+
+    @staticmethod
     def _map_status(
         status: str,
     ) -> OrchestratorStatus:
-        mapping: dict[str, OrchestratorStatus] = {
+        """Map specialist-agent statuses to orchestrator statuses."""
+
+        mapping: dict[
+            str,
+            OrchestratorStatus,
+        ] = {
             "success": "success",
             "clarification": "clarification",
             "unsupported": "unsupported",
+            "unavailable": "unsupported",
             "blocked": "blocked",
             "error": "error",
         }
@@ -1064,22 +1591,68 @@ class EnterpriseQnAOrchestrator:
         )
 
     @staticmethod
-    def _humanize(value: str) -> str:
+    def _humanize(
+        value: str,
+    ) -> str:
+        """Convert a technical column name into readable text."""
+
         return re.sub(
             r"\s+",
             " ",
-            value.replace("_", " "),
+            value.replace(
+                "_",
+                " ",
+            ),
         ).strip().title()
+
+    @staticmethod
+    def _to_dict(
+        value: Any,
+    ) -> dict[str, Any]:
+        """Convert a specialist response to a dictionary."""
+
+        if hasattr(
+            value,
+            "to_dict",
+        ):
+            converted = value.to_dict()
+
+            if isinstance(
+                converted,
+                dict,
+            ):
+                return converted
+
+        if hasattr(
+            value,
+            "__dataclass_fields__",
+        ):
+            converted = asdict(
+                value
+            )
+
+            if isinstance(
+                converted,
+                dict,
+            ):
+                return converted
+
+        raise TypeError(
+            "Specialist-agent response must provide "
+            "to_dict() or be a dataclass."
+        )
 
 
 def main() -> None:
-    """Run a local orchestrator demonstration."""
+    """Run a local multi-agent demonstration."""
 
     orchestrator = EnterpriseQnAOrchestrator()
 
     questions = [
         "Hello",
+        "What can you do?",
         "What KPIs are available?",
+        "What documents are available?",
         (
             "Show net revenue and gross margin percentage "
             "by region for Q2 2025"
@@ -1092,16 +1665,16 @@ def main() -> None:
             "Did Sparkle Summer achieve its planned "
             "sales lift, and why?"
         ),
-        (
-            "Plot actual sales lift by campaign"
-        ),
+        "Plot actual sales lift by campaign",
         (
             "Calculate correlation between promotion spend "
             "and actual sales lift"
         ),
         (
-            "Search the internet for current FMCG trends"
+            "Search the internet for the latest FMCG "
+            "market trends in India"
         ),
+        "Book a flight for tomorrow",
     ]
 
     for question in questions:
@@ -1115,6 +1688,28 @@ def main() -> None:
         print("Status:", response.status)
         print()
         print(response.answer)
+
+        if response.citations:
+            print()
+            print("Citations:")
+
+            for citation in response.citations:
+                print("-", citation)
+
+        if response.assumptions:
+            print()
+            print("Assumptions:")
+
+            for assumption in response.assumptions:
+                print("-", assumption)
+
+        if response.limitations:
+            print()
+            print("Limitations:")
+
+            for limitation in response.limitations:
+                print("-", limitation)
+
         print()
 
 
