@@ -48,6 +48,9 @@ class OrchestratorResponse:
     analysis_result: dict[str, Any] | None = None
     internet_result: dict[str, Any] | None = None
 
+    observability: dict[str, Any] | None = None
+    evaluation: dict[str, Any] | None = None
+
     citations: list[str] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
@@ -56,8 +59,6 @@ class OrchestratorResponse:
     )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the response to a serializable dictionary."""
-
         return asdict(self)
 
 

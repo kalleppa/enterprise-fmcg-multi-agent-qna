@@ -4,14 +4,23 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from src.agents.orchestrator import (
-    EnterpriseQnAOrchestrator,
-)
 from src.memory.conversation_store import (
     ConversationTurn,
     InMemoryConversationStore,
 )
 
+from typing import Protocol
+
+from src.evaluation.observability import (
+    ObservedOrchestrator,
+)
+
+class OrchestratorProtocol(Protocol):
+    def answer(
+        self,
+        question: str,
+    ) -> Any:
+        ...
 
 @dataclass
 class ConversationResponse:
@@ -79,14 +88,14 @@ class ConversationManager:
 
     def __init__(
         self,
-        orchestrator: EnterpriseQnAOrchestrator
+        orchestrator: OrchestratorProtocol
         | None = None,
         store: InMemoryConversationStore
         | None = None,
     ) -> None:
         self.orchestrator = (
             orchestrator
-            or EnterpriseQnAOrchestrator()
+            or ObservedOrchestrator()
         )
 
         self.store = (
