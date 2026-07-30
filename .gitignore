@@ -32,3 +32,7 @@ logs/
 # Operating system
 .DS_Store
 Thumbs.db
+
+# Generated semantic indexes
+data/generated/*.npz
+data/generated/semantic_index.json
